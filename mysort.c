@@ -48,7 +48,7 @@ void get_linedata(int nlines) {
 	while(i < nlines) {
 		l[i].temp = l[i].text;
 		while(ch = *(l[i].temp)){
-			if(isblank(ch))
+			if(ch == 32)
 				l[i].col++;
 			l[i].temp++;
 		}
@@ -80,6 +80,9 @@ typedef struct keyfield {
 	int merge;
 	int arr[10];
 	int index;
+
+	int check;
+	
 }keyfield;
 
 void init_keys(keyfield *k) {
@@ -95,6 +98,7 @@ void init_keys(keyfield *k) {
 	k->merge = 0;
 	k->arr[0] = 0;
 	k->index = 1;
+	k->check = 0;
 }
 
 int readfiles(keyfield *k) {
@@ -134,77 +138,75 @@ int readfiles(keyfield *k) {
 }
 
 void help() {
-	printf("usage: mysort [OPTION]... [FILE]...\n");
+	printf("usage: ./project [OPTION]... [FILE]...\n");
 	printf("Write sorted concatenation of all FILE(s) to standard output.\n");
 	printf("With no file, read standard output.\n");
-	printf("OPTIONS:\n");
-	printf("%7s, reverse\t\tReverse the result of comparisions\n", "-r");
-	printf("%7s, key=KEYDEF\t\tSort via a key. KEYDEF gives location\n", "-k");
-	printf("%7s, output=FILE\t\tWrite result to FILE instead of standard output\n", "-o");
+	printf("Ordering Options:\n");
+	printf("%7s, ignore leading blanks\tIgnore leading blanks\n", "-b");
+	printf("%7s, ignore-case\t\tFold lower-case to upper-case characters\n", "-f");
 	printf("%7s, numersic sort\t\tCompare according to string numeric value\n", "-n");
-	printf("%7s, \t\t\tPrint this usage and exit\n", "--help");	
+	printf("%7s, reverse\t\tReverse the result of comparisions\n", "-r");
+	printf("Other Options: \n");
+	printf("%7s, check\t\t\tCheck for sorted input, and report first bad line; Do not sort\n", "-c");
+	printf("%7s, key=KEYDEF\t\tSort via a key. KEYDEF gives location\n", "-k");
+	printf("%7s, merge\t\t\tMerge already sorted files; Do not sort.\n", "-m");
+	printf("%7s, output=FILE\t\tWrite result to FILE instead of standard output\n", "-o");
+	printf("     %s,\t\tRead input from the files specified by NUL-terminated names in file F\n\t\t\t\tIf F is - then read names from standard input\n","--files0-from=F");
+	printf("%7s,--help\t\t\tPrint this usage and exit\n", "-h");
 	exit(0);
-}
-
-void position (keyfield *k, int nlines) {
-	int i = 0, j;
-	while(i < nlines) {
-		l[i].temp = l[i].text;
-		j = 1;
-		/*for -k option*/
-		if(k->keydef == 1)
-			if(k->key <= l[i].col)
-				while(j < k->key) {
-					if(isblank(*(l[i].temp)))
-						j++;
-					l[i].temp++;
-				}
-		i++;
-	}
 }
 
 
 #define LOW 0	/*lowercase alphabet*/
 #define UPP 1	/*uppercase alphabet*/
 
-/*General case precedence : Space, Digit, Lowercase, Uppercase, OTHER*/
-	
-int compare(char *p, char *q,int num) {
+/*General case precedence : New Line, Space, Digit, Lowercase, Uppercase, OTHER*/
+int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 	int p_case, q_case;
-
 	if(strcmp(p,q) == 0)
 		return 1;
 
+	if(*p == 10)
+		return 1;
+	if(*q == 10)
+		return 0;
+	
+	if(ignoreblanks) {
+		while(*p == 32 && *p != 0)
+			p++;
+		while(*q == 32 && *q != 0)
+			q++;
+	}
+	
 
-	if(num == 1) {
+	if(*p == *q)
+		return compare(p + 1, q + 1, num, ignorecase, ignoreblanks);
+
+
+	if(*p == 32)
+		return 1;
+	if(*q == 32)
+		return 0;
+
+	if(num) {
 		if(atoi(p) == 0 || atoi(q) == 0)
-			return compare(p, q, 0);
-		if(atoi(p) == atoi(q) && *p == *q)
-			return compare(p + 1, q + 1, num);
+			return compare(p, q, 0, ignorecase, ignoreblanks);
+		if(atoi(p) == atoi(q))
+			return compare(p + 1, q + 1, num, ignorecase, ignoreblanks);
 		if(atoi(p) < atoi(q))
 			return 1;
 		if(atoi(p) > atoi(q))
 			return 0;
 	}
-	if(*p == *q)
-		return compare(p + 1, q + 1, num);
 
-
-	if(isblank(*p))
-		return 1;
-	else if(isblank(*q))
-		return 0;
-
-
-	if(isdigit(*p) && isdigit(*q)){
+	if(isdigit(*p) && isdigit(*q))
 		if(*p < *q)
 			return 1;
 		else
 			return 0;
-	}
-	else if(isdigit(*p))
+	if(isdigit(*p))
 		return 1;	
-	else if(isdigit(*q))
+	if(isdigit(*q))
 		return 0;
 
 
@@ -217,88 +219,120 @@ int compare(char *p, char *q,int num) {
 	else if(*q >= 97 && *q <=122)
 		q_case = LOW;
 
+
 	if(p_case == q_case)
 		if (*p < *q)
 			return 1;
 		else
 			return 0;
-	else if(p_case == LOW)
+
+	if(ignorecase == 1) {
+		if(strcasecmp(p, q) <= 0)
+			return 1;
+		else
+			return 0;
+	}
+
+	if(p_case == LOW)
 		if((*p - 'a') <= (*q - 'A'))
 			return 1;
 		else
  			return 0;
-	else if(p_case == UPP)
+	if(p_case == UPP)
 		if((*p - 'A') < (*q - 'a'))
 			return 1;
 		else
  			return 0;
-	
 
-	else if(*p < *q)
+	if(*p < *q)
 		return 1;
-	else
-		return 0;
-	
+	return 0;
 }
 
-void merging(int low, int mid, int high, int num) {
-	int l1, l2, i;
-
+void merging(int low, int mid, int high, keyfield k) {
+	int l1, l2, i, j;
+	char a = '\n';
 	for(l1 = low, l2 = mid + 1, i = low; l1 <= mid && l2 <= high; i++) {
-	if(compare(l[l1].temp, l[l2].temp, num))
-		b[i] = l[l1++].text;
-	else
-		b[i] = l[l2++].text;
+		l[l1].temp = l[l1].text;
+		l[l2].temp = l[l2].text;
+		/*for -k option*/
+		if(k.keydef == 1) {
+			j = 1;
+			if(k.key <= l[l1].col)
+				while(j < k.key) {
+					if(*(l[l1].temp) == 32)
+						j++;
+					l[l1].temp++;
+				}
+			else if(k.key <= l[l2].col)
+				l[l2].temp = &a;
+			j = 1;
+			if(k.key <= l[l2].col)
+				while(j < k.key) {
+					if(*(l[l2].temp) == 32)
+						j++;
+					l[l2].temp++;
+				}
+			else if (k.key <= l[l1].col)
+				l[l1].temp = &a;
+				
+		}
+		if(compare(l[l1].temp, l[l2].temp, k.num, k.ignorecase, k.ignoreblanks))
+			b[i] = l[l1++].text;
+		else
+			b[i] = l[l2++].text;
 	}
-
-	while(l1 <= mid)    
+	while(l1 <= mid)
 		b[i++] = l[l1++].text;
 
-   	while(l2 <= high)   
+   	while(l2 <= high) 
 		b[i++] = l[l2++].text;
 
-	
 	for(i = low; i <= high; i++)
 		l[i].text = b[i];
+	
 }
 
-void sort(int low, int high, int num) {
+void sort(int low, int high, keyfield k) {
 	int mid;
 
 	if(low < high) {
 		mid = (low + high) / 2;
-		sort(low, mid, num);
-		sort(mid + 1, high, num);
-		merging(low, mid, high, num);
+		sort(low, mid, k);
+		sort(mid + 1, high, k);
+		merging(low, mid, high, k);
 	}
 	else
 		return;
 }
 
 
+#define SIZE 20
 
 int main(int argc, char *argv[]) {
 	keyfield k;
 	init_keys(&k);
 	k.p = (char **) malloc(sizeof(char*) * (argc - 1));
-	int nlines = 0, i, j, sum;
-	char c;
-
+	int nlines = 0, i, j, sum, m, len;
+	char c, str[SIZE], str1[SIZE];
+	FILE *f, *fp;
+	
 	void read() {
 		for(i = 1; i < argc; i++) {
-			if(argv[i][0] == '-')
+			if(argv[i][0] == '-') {
+				len = strlen(argv[i]);				//work on error handling
 				switch(argv[i][1]) {
 					case 'r':
 						k.reverse = 1;
 						break;
-			case 'k':
+					case 'k':
 						if(strlen(argv[i]) > 2) {
 							j = 2; sum = 0; 
 							while(c = argv[i][j])
 								if(isdigit(argv[i][j]))
 									sum = sum * 10 + argv[i][j++] - '0';
 								else {
-									printf("sort: invalid number at field start: invalid count at start of '%c'\n", c);
+									printf("Sort: Invalid number at field start: Invalid count at start of '%c'\n", c);
 									exit(1);
 								}
 							k.key = sum;
@@ -306,14 +340,14 @@ int main(int argc, char *argv[]) {
 						else {
 							j = 0; sum = 0; i++;
 							if(i == argc) {
-								printf("sort: option requires an argument -- 'k'\nTry 'mysort --help' for more information.\n\n");
+								printf("Sort: Option requires an argument --'k'\nTry 'mysort --help' for more information.\n\n");
 								exit(1);
 							}
 							while(c = argv[i][j])
 								if(isdigit(argv[i][j]))
 									sum = sum * 10 + argv[i][j++] - '0';
 								else {
-									printf("sort: invalid number at field start: invalid count at start of '%c'\n", c);							
+									printf("Sort: Invalid number at field start: Invalid count at start of '%c'\n", c);							
 									exit(1);
 								}
 							k.key = sum;
@@ -324,7 +358,7 @@ int main(int argc, char *argv[]) {
 					case 'o':
 						k.output = 1;
 						if(i == argc - 1) {
-							printf("sort: option requires an argument -- 'o'\nTry 'sort --help' for more information.\n\n");
+							printf("Sort: Option requires an argument --'o'\nTry 'sort --help' for more information.\n");
 							exit(1);
 						}
 						k.output_file = argv[++i];
@@ -335,9 +369,67 @@ int main(int argc, char *argv[]) {
 					case 'n':
 						k.num = 1;
 						break;
+					case 'h':
+						help();
 					case '-':
 						if(strcmp(argv[i], "--help") == 0)
 							help();
+
+						for(j = 0 ; j < 14; j++)
+							str[j] = argv[i][j];
+						str[j] = '\0';
+						if(strcmp(str, "--files0-from=") == 0) {
+							if(strlen(argv[i]) == 14) {
+								printf("Sort: Option requires an argument file '--files0-from='\nTry 'sort --help' for more information.\n");
+							exit(1);
+							}
+							m = 14; j = 0;
+							while(argv[i][m])
+								str[j++] = argv[i][m++];
+							str[j] = '\0';
+							if(strcmp(str, "-") == 0) {
+								while(fgets(str1, SIZE, stdin)) {
+									f = fopen(str1, "r");
+										if(f) {
+										k.p[k.nfiles] = (char *)malloc(strlen(str1) + 1);
+										strcpy(k.p[k.nfiles], str1);
+										(k.nfiles)++;
+										fclose(f);
+									}
+									else {
+										printf("Sort: Cannot read file: %sNo such file or directory\n", str1);
+										exit(1);
+									}
+								}
+							break;
+							}	
+
+							f = fopen(str, "r");
+							if(f == NULL) {
+								printf("Cannot open F: %s\n", str);
+								exit(1);
+							}
+							while(!feof(f)) {
+								m = 0;
+								while((str1[m] = fgetc(f)) != 0 && str1[m] != EOF)
+									m++;
+								fp = fopen(str1, "r");
+								if(fp) {
+									k.p[k.nfiles] = malloc(strlen(str1)+1);
+									strcpy(k.p[k.nfiles],str1);
+									(k.nfiles)++;
+									fclose(fp);
+								}
+								else {
+									printf("In F, Cannot open file: %s\n", str1);
+									exit(1);
+								}
+							}
+						}
+						else {
+							printf("Invalid option - '%s'\nTry 'sort --help' for more information.\n", argv[i]);
+							exit(1);
+						}
 						break;
 					case 'm' :
 						k.merge = 1;
@@ -348,12 +440,15 @@ int main(int argc, char *argv[]) {
 					case 'f' :
 						k.ignorecase = 1;
 						break;
+					case 'c' : 
+						k.check = 1;
+						break;
 					default:
-						printf("INVALID OPTION\n");
+						printf("Invalid Option - '%s'\nTry 'sort --help' for more information\n", argv[i]);
 						exit(1);
 				}
+			}
 			else {
-				FILE *f;
 				f = fopen(argv[i], "r");
 				if(f != NULL) {
 					k.p[k.nfiles] = argv[i];
@@ -361,12 +456,12 @@ int main(int argc, char *argv[]) {
 					fclose(f);
 				}
 				else {
-					printf("Cannot open file: %s", argv[i]);
+					printf("Invalid File-name : %s\n", argv[i]);
 					exit(1);
 				}
 			}
-		} 	
-	}	
+		}
+	}
 
 	/*read as filter*/
 	read();
@@ -374,10 +469,10 @@ int main(int argc, char *argv[]) {
 	if(l == NULL)
 		exit(1);
 							/*read from files*/
-	if(k.nfiles)
+	if(k.nfiles > 0)
 		nlines = readfiles(&k);
 							/*read from stdin*/
-	else{
+	else if(k.merge == 0) {
 		int size_text; 
 		nlines = 0;
 		char *s;
@@ -410,42 +505,78 @@ int main(int argc, char *argv[]) {
 		get_linedata(nlines);
 	}
 	
-	position(&k, nlines);
-	
-	b = (char **) malloc(sizeof(char *) * nlines);
-	for(i = 0; i < nlines; i++)
-		b[i] = (char *) malloc(sizeof(char) * (l[i].lenght + 1));
-	
-	if(k.merge == 0)					
-		sort(0, nlines - 1, k.num);
-	/*else if(k.nfiles > 1)					
-		for(i = 1; i < k.index; i++)		
-			merging(0, k.arr[i], k.arr[i + 1], k.num);
-	else {							
-		printf("ONLY ONE FILE INPUT FOR MERGING\n");
+	if(k.check) {
+		if(k.nfiles > 1) {
+			printf("sort: Extra operand(s) not allowed with '-c': %s\n", k.p[1]);
+			return 0;
+		}
+		if(k.reverse)
+			for(i = 1; i < nlines; i++) {
+				if(strcmp(l[i - 1].text, l[i].text) && compare(l[i - 1].text, l[i].text, k.num, k.ignorecase, k.ignoreblanks) == 1) {
+					if(k.nfiles == 1)
+						printf("Sort: %s:%d: Disorder: %s", k.p[0], i + 1, l[i].text);
+					else
+						printf("Sort: -:%d: Disorder: %s", i + 1, l[i].text);
+					return 0;
+				}
+			}
+		else
+			for(i = 1; i < nlines; i++){
+				if(compare(l[i - 1].text, l[i].text, k.num, k.ignorecase, k.ignoreblanks) == 0) {
+					if(k.nfiles == 1)
+						printf("Sort: %s:%d: Disorder: %s", k.p[0], i + 1, l[i].text);
+					else
+						printf("Sort: -:%d: Disorder: %s", i + 1, l[i].text);
+					return 0;
+				}
+			}
 		return 0;
 	}
-	if(k.unique != 0) {
+
+
+
+	b = (char **) malloc(sizeof(char *) * nlines);
+	if(k.merge == 0)	
+		sort(0, nlines - 1, k);
+	else if(k.nfiles > 1)
+		for(i = 1; i < k.index - 1; i++)
+			merging(0, k.arr[i], k.arr[i + 1], k);
+	else{
+		if(k.nfiles == 0)
+			printf("No FILE input for merging\n");
+		else
+			printf("Only one FILE input for merging : %s\n", k.p[0]);
+		return 0;
+	}
+
+
+	if(k.unique == 1) {
 		for(i = 1; i < nlines; i++) {
-			if(!strcmp(l[i].text, l[i - 1].text)) {
-				free(l[i-1].text);
-				for(j = i - 1; j < nlines - 1; j++)
-					l[j] = l[j + 1];
-				free(&l[j]);
-				nlines--;
+			if(k.ignorecase == 0)
+				while(i != nlines && strcmp(l[i].text, l[i - 1].text) == 0) {
+					for(j = i - 1; j < nlines - 1; j++)
+						strcpy(l[j].text, l[j + 1].text);
+					nlines--;
+				}
+			else {
+				while(i != nlines && (strcasecmp(l[i].text, l[i - 1].text) == 0)) {
+					for(j = i - 1; j < nlines - 1; j++)
+						strcpy(l[j].text, l[j + 1].text);
+					nlines--;
+				}
 			}
 		}
 	}
-	*/		
+
 	if(k.output == 0) {
-		printf(" ------ \n");
+		printf("------- \n");
 		i = nlines - 1;
 		for(j = 0; j < nlines; j++)
 			if(k.reverse == 1)
 				printf("%s", l[i--].text);
 			else
 				printf("%s", l[j].text);
-		printf(" ------\n");	
+		printf("-------\n");	
 	}
 	else {
 		FILE *fp;
