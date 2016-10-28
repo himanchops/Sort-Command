@@ -138,9 +138,10 @@ int readfiles(keyfield *k) {
 }
 
 void help() {
-	printf("usage: ./project [OPTION]... [FILE]...\n");
+	printf("Usage: ./project [OPTION]... [FILE]...\n");
+	printf("   or: ./project [OPTION]... --files0-from=F \n");
 	printf("Write sorted concatenation of all FILE(s) to standard output.\n");
-	printf("With no file, read standard output.\n");
+	printf("With no file, or when FILE is -, read standard output.\n");
 	printf("Ordering Options:\n");
 	printf("%7s, ignore leading blanks\tIgnore leading blanks\n", "-b");
 	printf("%7s, ignore-case\t\tFold lower-case to upper-case characters\n", "-f");
@@ -314,7 +315,7 @@ int main(int argc, char *argv[]) {
 	init_keys(&k);
 	k.p = (char **) malloc(sizeof(char*) * (argc - 1));
 	int nlines = 0, i, j, sum, m, len;
-	char c, str[SIZE], str1[SIZE];
+	char c, str[SIZE], *str1 = (char *) malloc(SIZE), *str2 = (char *)malloc(SIZE);
 	FILE *f, *fp;
 	
 	void read() {
@@ -388,42 +389,42 @@ int main(int argc, char *argv[]) {
 								str[j++] = argv[i][m++];
 							str[j] = '\0';
 							if(strcmp(str, "-") == 0) {
-								while(fgets(str1, SIZE, stdin)) {
-									f = fopen(str1, "r");
-										if(f) {
-										k.p[k.nfiles] = (char *)malloc(strlen(str1) + 1);
+								fgets(str1, 128, stdin);
+								while(*str1) {
+									f = fopen(str1+2, "r");
+									if(f) {
+										k.p[k.nfiles] = (char *) malloc(strlen(str2) + 1);
 										strcpy(k.p[k.nfiles], str1);
 										(k.nfiles)++;
 										fclose(f);
 									}
 									else {
-										printf("Sort: Cannot read file: %sNo such file or directory\n", str1);
+										printf("Sort: Cannot read file: %sNo such file or directory\n", str1+2);
 										exit(1);
 									}
+									str1 = str1 + strlen(str1) + 1;
 								}
-							break;
-							}	
-
+								break;
+							}
 							f = fopen(str, "r");
 							if(f == NULL) {
-								printf("Cannot open F: %s\n", str);
+								printf("Sort : Cannot open '%s' for reading: No such file or directory\n", str);
 								exit(1);
 							}
-							while(!feof(f)) {
-								m = 0;
-								while((str1[m] = fgetc(f)) != 0 && str1[m] != EOF)
-									m++;
-								fp = fopen(str1, "r");
-								if(fp) {
-									k.p[k.nfiles] = malloc(strlen(str1)+1);
-									strcpy(k.p[k.nfiles],str1);
+							fgets(str1, 128, f);
+							while(*str1) {
+								f = fopen(str1+2, "r");
+								if(f) {
+									k.p[k.nfiles] = (char *) malloc(strlen(str2) + 1);
+									strcpy(k.p[k.nfiles], str1);
 									(k.nfiles)++;
-									fclose(fp);
+									fclose(f);
 								}
 								else {
-									printf("In F, Cannot open file: %s\n", str1);
+									printf("Sort: Cannot read file: %sNo such file or directory\n", str1+2);
 									exit(1);
 								}
+								str1 = str1 + strlen(str1) + 1;
 							}
 						}
 						else {
