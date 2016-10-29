@@ -48,7 +48,7 @@ void get_linedata(int nlines) {
 	while(i < nlines) {
 		l[i].temp = l[i].text;
 		while(ch = *(l[i].temp)){
-			if(ch == 32)
+			if(ch == 32 || ch == 9)
 				l[i].col++;
 			l[i].temp++;
 		}
@@ -261,7 +261,7 @@ void merging(int low, int mid, int high, keyfield k) {
 			j = 1;
 			if(k.key <= l[l1].col)
 				while(j < k.key) {
-					if(*(l[l1].temp) == 32)
+					if(*(l[l1].temp) == 32 || *(l[l1].temp) == 9)
 						j++;
 					l[l1].temp++;
 				}
@@ -270,7 +270,7 @@ void merging(int low, int mid, int high, keyfield k) {
 			j = 1;
 			if(k.key <= l[l2].col)
 				while(j < k.key) {
-					if(*(l[l2].temp) == 32)
+					if(*(l[l2].temp) == 32 || *(l[l2].temp) == 9)
 						j++;
 					l[l2].temp++;
 				}
@@ -291,9 +291,9 @@ void merging(int low, int mid, int high, keyfield k) {
 
 	for(i = low; i <= high; i++)
 		l[i].text = b[i];
-	
 }
 
+/*Merge Sort*/
 void sort(int low, int high, keyfield k) {
 	int mid;
 
@@ -315,13 +315,13 @@ int main(int argc, char *argv[]) {
 	init_keys(&k);
 	k.p = (char **) malloc(sizeof(char*) * (argc - 1));
 	int nlines = 0, i, j, sum, m, len;
-	char c, str[SIZE], *str1 = (char *) malloc(SIZE), *str2 = (char *)malloc(SIZE);
+	char c, str[SIZE], *str1 = (char *) malloc(3 * SIZE);
+	char *str2 = str1;
 	FILE *f, *fp;
 	
 	void read() {
 		for(i = 1; i < argc; i++) {
 			if(argv[i][0] == '-') {
-				len = strlen(argv[i]);				//work on error handling
 				switch(argv[i][1]) {
 					case 'r':
 						k.reverse = 1;
@@ -382,7 +382,7 @@ int main(int argc, char *argv[]) {
 						if(strcmp(str, "--files0-from=") == 0) {
 							if(strlen(argv[i]) == 14) {
 								printf("Sort: Option requires an argument file '--files0-from='\nTry 'sort --help' for more information.\n");
-							exit(1);
+								exit(1);
 							}
 							m = 14; j = 0;
 							while(argv[i][m])
@@ -393,8 +393,8 @@ int main(int argc, char *argv[]) {
 								while(*str1) {
 									f = fopen(str1+2, "r");
 									if(f) {
-										k.p[k.nfiles] = (char *) malloc(strlen(str2) + 1);
-										strcpy(k.p[k.nfiles], str1);
+										k.p[k.nfiles] = (char *) malloc(strlen(str1+2) + 1);
+										strcpy(k.p[k.nfiles], str1+2);
 										(k.nfiles)++;
 										fclose(f);
 									}
@@ -406,6 +406,7 @@ int main(int argc, char *argv[]) {
 								}
 								break;
 							}
+
 							f = fopen(str, "r");
 							if(f == NULL) {
 								printf("Sort : Cannot open '%s' for reading: No such file or directory\n", str);
@@ -415,8 +416,8 @@ int main(int argc, char *argv[]) {
 							while(*str1) {
 								f = fopen(str1+2, "r");
 								if(f) {
-									k.p[k.nfiles] = (char *) malloc(strlen(str2) + 1);
-									strcpy(k.p[k.nfiles], str1);
+									k.p[k.nfiles] = (char *) malloc(strlen(str1+2) + 1);
+									strcpy(k.p[k.nfiles], str1+2);
 									(k.nfiles)++;
 									fclose(f);
 								}
@@ -466,6 +467,7 @@ int main(int argc, char *argv[]) {
 
 	/*read as filter*/
 	read();
+	free(str2);
 	l = (line *) malloc(sizeof(line) * size_line);
 	if(l == NULL)
 		exit(1);
@@ -477,11 +479,6 @@ int main(int argc, char *argv[]) {
 		int size_text; 
 		nlines = 0;
 		char *s;
-		l = (line *) malloc(sizeof(line) * 10);
-		if(l == NULL) {
-			printf("Failed for %d lines\n", size_line);
-			exit(1);
-		}
 		get_line(nlines);
 		while(fgets(l[nlines].text, 100, stdin)) {
 			if(strlen(l[nlines].text) == 99) {
@@ -549,7 +546,8 @@ int main(int argc, char *argv[]) {
 			printf("Only one FILE input for merging : %s\n", k.p[0]);
 		return 0;
 	}
-
+	free(b);
+	int tlines = nlines;
 
 	if(k.unique == 1) {
 		for(i = 1; i < nlines; i++) {
@@ -589,4 +587,8 @@ int main(int argc, char *argv[]) {
 			else
 				fprintf(fp,"%s", l[j].text);
 	}
+	for(i = 0; i < tlines; i++)
+		free(l[i].text);
+	free(l);
+	free(k.p);
 }
