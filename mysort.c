@@ -1,41 +1,57 @@
+
+/*****************************************************************************
+ * Copyright (C) Himanshu N. Chopra himanchops@gmail.com
+ *
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; If not, see <http://www.gnu.org/licenses/>.
+
+ *****************************************************************************/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 
 char **b;
-int size_line = 50;
 
 /*to read file line by line*/ 
 typedef struct line {
 	char *text, *temp;
-	int lenght;
 	int col;
 }line;
 
 void init_line(line *l) {
-	l->lenght = 0;
 	l->col = 0;
 	l->temp = NULL;
 }
 
 line *l;
 
+/*Realloc if more lines*/
 void checksize(int count) {
+	static int size_line = 50;
 	if(count == size_line) {
 		size_line *= 2;
 		l = (line *) realloc(l, sizeof(line) * size_line);
-		if(l == NULL) {
-			printf("Failed for %d lines\n", size_line);
+		if(l == NULL)
 			exit(1);
-		}
 	}
 }
 
 
 void get_line(int nlines) {
 	checksize(nlines);
-	l[nlines].text = (char *) malloc(sizeof(char) * 100);
+	l[nlines].text = (char *) malloc(128);
 	if(l[nlines].text == NULL)
 		exit(1);
 	init_line(&l[nlines]);
@@ -53,7 +69,6 @@ void get_linedata(int nlines) {
 			l[i].temp++;
 		}
 		l[i].col++;
-		l[i].lenght = strlen(l[i].text);
 		i++;
 	}
 }
@@ -101,6 +116,7 @@ void init_keys(keyfield *k) {
 	k->check = 0;
 }
 
+/*Read lines from files*/
 int readfiles(keyfield *k) {
 	FILE *fp;
 	int size_text, j = 0, nlines = 0;
@@ -108,19 +124,19 @@ int readfiles(keyfield *k) {
 	while( j < k->nfiles) {
 		fp = fopen(k->p[j++], "r");
 		get_line(nlines);
-		while(fgets(l[nlines].text, 100, fp)) {
+		while(fgets(l[nlines].text, 128, fp)) {
 									/*get complete line, catenation if needed*/
-			if(strlen(l[nlines].text) == 99) {
-				size_text = 100;
- 				s = (char *) malloc(sizeof(char) * size_text);
-				while(fgets(s, size_text, stdin) && s[strlen(s) - 1] != '\n') {
-					size_text += 100;
-		    			l[nlines].text = (char *) realloc(l[nlines].text, sizeof(char) * size_text);
+			if(strlen(l[nlines].text) == 127) {
+				size_text = 128;
+ 				s = (char *) malloc(size_text);
+				while(fgets(s, size_text, fp) && s[strlen(s) - 1] != '\n') {
+					size_text += 128;
+		    			l[nlines].text = (char *) realloc(l[nlines].text, size_text);
 		    			strcat(l[nlines].text, s);
 		 		}
 				if(s[strlen(s) - 1] == '\n') {
-					size_text += 100;
-					l[nlines].text = (char *) realloc(l[nlines].text, sizeof(char) * size_text);
+					size_text += 128;
+					l[nlines].text = (char *) realloc(l[nlines].text, size_text);
 					strcat(l[nlines].text, s);
 				}
 				free(s);
@@ -132,7 +148,6 @@ int readfiles(keyfield *k) {
 		k->arr[k->index] = nlines - 1;
 		(k->index)++;
 	}
-
 	get_linedata(nlines);
 	return nlines;
 }
@@ -152,6 +167,7 @@ void help() {
 	printf("%7s, key=KEYDEF\t\tSort via a key. KEYDEF gives location\n", "-k");
 	printf("%7s, merge\t\t\tMerge already sorted files; Do not sort.\n", "-m");
 	printf("%7s, output=FILE\t\tWrite result to FILE instead of standard output\n", "-o");
+	printf("%7s, unique\t\t\tRemove duplicates from result\n", "-u");	
 	printf("     %s,\t\tRead input from the files specified by NUL-terminated names in file F\n\t\t\t\tIf F is - then read names from standard input\n","--files0-from=F");
 	printf("%7s,--help\t\t\tPrint this usage and exit\n", "-h");
 	exit(0);
@@ -161,9 +177,9 @@ void help() {
 #define LOW 0	/*lowercase alphabet*/
 #define UPP 1	/*uppercase alphabet*/
 
-/*General case precedence : New Line, Space, Digit, Lowercase, Uppercase, OTHER*/
+/*General Case Precedence : New Line, Space, Digit, Lowercase, Uppercase, OTHER*/
 int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
-	int p_case, q_case;
+	int p_case, q_case, p_num, q_num;
 	if(strcmp(p,q) == 0)
 		return 1;
 
@@ -172,13 +188,17 @@ int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 	if(*q == 10)
 		return 0;
 	
-	if(ignoreblanks) {
-		while(*p == 32 && *p != 0)
-			p++;
-		while(*q == 32 && *q != 0)
-			q++;
+	if(num) {
+		p_num = atoi(p); q_num = atoi(q);
+		if(p_num == 0 || q_num == 0)
+			return compare(p, q, 0, ignorecase, ignoreblanks);
+		if(p_num == q_num)
+			return compare(p + 1, q + 1, num, ignorecase, ignoreblanks);
+		if(p_num < q_num)
+			return 1;
+		if(p_num > q_num)
+			return 0;
 	}
-	
 
 	if(*p == *q)
 		return compare(p + 1, q + 1, num, ignorecase, ignoreblanks);
@@ -189,16 +209,6 @@ int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 	if(*q == 32)
 		return 0;
 
-	if(num) {
-		if(atoi(p) == 0 || atoi(q) == 0)
-			return compare(p, q, 0, ignorecase, ignoreblanks);
-		if(atoi(p) == atoi(q))
-			return compare(p + 1, q + 1, num, ignorecase, ignoreblanks);
-		if(atoi(p) < atoi(q))
-			return 1;
-		if(atoi(p) > atoi(q))
-			return 0;
-	}
 
 	if(isdigit(*p) && isdigit(*q))
 		if(*p < *q)
@@ -251,32 +261,58 @@ int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 }
 
 void merging(int low, int mid, int high, keyfield k) {
-	int l1, l2, i, j;
+	int l1, l2, i, j, flag;
 	char a = '\n';
 	for(l1 = low, l2 = mid + 1, i = low; l1 <= mid && l2 <= high; i++) {
 		l[l1].temp = l[l1].text;
 		l[l2].temp = l[l2].text;
 		/*for -k option*/
 		if(k.keydef == 1) {
+			
+			while(*(l[l1].temp) == 32 || *(l[l1].temp) == 9)	
+				l[l1].temp++;
 			j = 1;
 			if(k.key <= l[l1].col)
-				while(j < k.key) {
+				while(j < k.key && *(l[l1].temp)) {
+					flag = 0;
+					if(k.ignoreblanks) {
+						while(*(l[l1].temp) == 32 || *(l[l1].temp) == 9) {					
+							flag = 1;
+							l[l1].temp++;
+						}
+						if(flag)
+							j++;
+					}
 					if(*(l[l1].temp) == 32 || *(l[l1].temp) == 9)
 						j++;
-					l[l1].temp++;
+					if(flag == 0)
+						l[l1].temp++;
 				}
 			else if(k.key <= l[l2].col)
 				l[l2].temp = &a;
+			
+
+			while(*(l[l2].temp) == 32 || *(l[l2].temp) == 9)	
+				l[l2].temp++;
 			j = 1;
 			if(k.key <= l[l2].col)
-				while(j < k.key) {
+				while(j < k.key && *(l[l2].temp)) {
+					flag = 0;
+					if(k.ignoreblanks) {
+						while(*(l[l2].temp) == 32 || *(l[l2].temp) == 9) {					
+							flag = 1;
+							l[l2].temp++;
+						}
+						if(flag)
+							j++;
+					}
 					if(*(l[l2].temp) == 32 || *(l[l2].temp) == 9)
 						j++;
-					l[l2].temp++;
+					if(flag == 0)
+						l[l2].temp++;
 				}
 			else if (k.key <= l[l1].col)
 				l[l1].temp = &a;
-				
 		}
 		if(compare(l[l1].temp, l[l2].temp, k.num, k.ignorecase, k.ignoreblanks))
 			b[i] = l[l1++].text;
@@ -313,12 +349,12 @@ void sort(int low, int high, keyfield k) {
 int main(int argc, char *argv[]) {
 	keyfield k;
 	init_keys(&k);
-	k.p = (char **) malloc(sizeof(char*) * (argc - 1));
+	k.p = (char **) malloc(sizeof(char *) * (argc - 1));
 	int nlines = 0, i, j, sum, m, len;
-	char c, str[SIZE], *str1 = (char *) malloc(3 * SIZE);
-	char *str2 = str1;
+	char c, str[SIZE], *str1 = (char *) malloc(128), *str2 = str1;
 	FILE *f, *fp;
-	
+
+	/*Read Keys, Options and Files*/
 	void read() {
 		for(i = 1; i < argc; i++) {
 			if(argv[i][0] == '-') {
@@ -390,11 +426,15 @@ int main(int argc, char *argv[]) {
 							str[j] = '\0';
 							if(strcmp(str, "-") == 0) {
 								fgets(str1, 128, stdin);
+								if(*str1 == 0) {
+									printf("Sort: No input from '-'\n");
+									exit(1);
+								}
 								while(*str1) {
-									f = fopen(str1+2, "r");
+									f = fopen(str1, "r");
 									if(f) {
-										k.p[k.nfiles] = (char *) malloc(strlen(str1+2) + 1);
-										strcpy(k.p[k.nfiles], str1+2);
+										k.p[k.nfiles] = (char *) malloc(strlen(str1) + 1);
+										strcpy(k.p[k.nfiles], str1);
 										(k.nfiles)++;
 										fclose(f);
 									}
@@ -413,11 +453,15 @@ int main(int argc, char *argv[]) {
 								exit(1);
 							}
 							fgets(str1, 128, f);
+							if(*str1 == 0) {
+								printf("Sort: No input from '%s'\n", str);
+								exit(1);
+							}
 							while(*str1) {
-								f = fopen(str1+2, "r");
+								f = fopen(str1, "r");
 								if(f) {
-									k.p[k.nfiles] = (char *) malloc(strlen(str1+2) + 1);
-									strcpy(k.p[k.nfiles], str1+2);
+									k.p[k.nfiles] = (char *) malloc(strlen(str1) + 1);
+									strcpy(k.p[k.nfiles], str1);
 									(k.nfiles)++;
 									fclose(f);
 								}
@@ -458,40 +502,44 @@ int main(int argc, char *argv[]) {
 					fclose(f);
 				}
 				else {
-					printf("Invalid File-name : %s\n", argv[i]);
+					printf("Sort: Cannot read '%s': No such file or directory\n", argv[i]);
 					exit(1);
 				}
 			}
 		}
 	}
 
-	/*read as filter*/
 	read();
 	free(str2);
-	l = (line *) malloc(sizeof(line) * size_line);
+
+	/*read as filter*/
+	l = (line *) malloc(sizeof(line) * 50);
 	if(l == NULL)
 		exit(1);
-							/*read from files*/
+
+	/*read from files*/
 	if(k.nfiles > 0)
 		nlines = readfiles(&k);
-							/*read from stdin*/
+	
+	/*read from stdin*/
 	else if(k.merge == 0) {
 		int size_text; 
 		nlines = 0;
 		char *s;
 		get_line(nlines);
-		while(fgets(l[nlines].text, 100, stdin)) {
-			if(strlen(l[nlines].text) == 99) {
-				size_text = 100;
- 				s = (char *) malloc(sizeof(char) * size_text);
+		while(fgets(l[nlines].text, 128, stdin)) {
+
+			if(strlen(l[nlines].text) == 127) {
+				size_text = 128;
+ 				s = (char *) malloc(size_text);
 				while(fgets(s, size_text, stdin) && s[strlen(s) - 1] != '\n') {
-					size_text += 100;
-	    				l[nlines].text = (char *) realloc(l[nlines].text, sizeof(char) * size_text);
+					size_text += 128;
+	    				l[nlines].text = (char *) realloc(l[nlines].text, size_text);
 					strcat(l[nlines].text, s);
 		 		}
 				if(s[strlen(s) - 1] == '\n') {
-					size_text += 100;
-					l[nlines].text = (char *) realloc(l[nlines].text, sizeof(char) * size_text);
+					size_text += 128;
+					l[nlines].text = (char *) realloc(l[nlines].text, size_text);
 					strcat(l[nlines].text, s);
 				}
 				free(s);
@@ -503,6 +551,8 @@ int main(int argc, char *argv[]) {
 		get_linedata(nlines);
 	}
 	
+
+	/*Check if sorted*/
 	if(k.check) {
 		if(k.nfiles > 1) {
 			printf("sort: Extra operand(s) not allowed with '-c': %s\n", k.p[1]);
@@ -532,7 +582,7 @@ int main(int argc, char *argv[]) {
 	}
 
 
-
+	/*Sort or Merge*/
 	b = (char **) malloc(sizeof(char *) * nlines);
 	if(k.merge == 0)	
 		sort(0, nlines - 1, k);
@@ -549,6 +599,7 @@ int main(int argc, char *argv[]) {
 	free(b);
 	int tlines = nlines;
 
+	/*Remove Duplicates*/
 	if(k.unique == 1) {
 		for(i = 1; i < nlines; i++) {
 			if(k.ignorecase == 0)
@@ -567,6 +618,8 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+
+	/*Output on STDOUT or in FILE*/
 	if(k.output == 0) {
 		printf("------- \n");
 		i = nlines - 1;
@@ -587,8 +640,11 @@ int main(int argc, char *argv[]) {
 			else
 				fprintf(fp,"%s", l[j].text);
 	}
+
+
 	for(i = 0; i < tlines; i++)
 		free(l[i].text);
 	free(l);
 	free(k.p);
+	return 0;
 }
