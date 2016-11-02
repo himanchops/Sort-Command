@@ -8,7 +8,7 @@ Sort - Sort lines of text files
 usage: ./project [OPTION]... [FILE]...
    or: ./project [OPTION]... --files0-from=F
 Write sorted concatenation of all FILE(s) to standard output.
-With no file, or when FILE is -, read standard output.
+With no file, or when FILE is -, read standard input.
 
 Ordering Options:
      -b, ignore leading blanks	Ignore leading blanks

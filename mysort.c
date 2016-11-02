@@ -157,7 +157,7 @@ void help() {
 	printf("Usage: ./project [OPTION]... [FILE]...\n");
 	printf("   or: ./project [OPTION]... --files0-from=F \n");
 	printf("Write sorted concatenation of all FILE(s) to standard output.\n");
-	printf("With no file, or when FILE is -, read standard output.\n");
+	printf("With no file, or when FILE is -, read standard input.\n");
 	printf("Ordering Options:\n");
 	printf("%7s, ignore leading blanks\tIgnore leading blanks\n", "-b");
 	printf("%7s, ignore-case\t\tFold lower-case to upper-case characters\n", "-f");
