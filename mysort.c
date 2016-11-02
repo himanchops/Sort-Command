@@ -38,7 +38,7 @@ void init_line(line *l) {
 
 line *l;
 
-/*Realloc if more lines*/
+/*Reallocate memory, if more lines*/
 void checksize(int count) {
 	static int size_line = LINES;
 	if(count == size_line) {
@@ -49,7 +49,7 @@ void checksize(int count) {
 	}
 }
 
-
+/*Allocate Line-data*/
 void get_line(int nlines) {
 	checksize(nlines);
 	l[nlines].text = (char *) malloc(128);
@@ -58,7 +58,7 @@ void get_line(int nlines) {
 	init_line(&l[nlines]);
 }
 
-
+/*Gives No. of Columns in lines*/
 void get_linedata(int nlines) {
 	char ch;
 	int i = 0;
@@ -177,7 +177,7 @@ void help() {
 
 #define LOW 0	/*lowercase alphabet*/
 #define UPP 1	/*uppercase alphabet*/
-/*General Case Precedence : New Line, Space, Digit, Lowercase, Uppercase, OTHER*/
+/*General Case Precedence: New Line, Space, Digit, Lowercase, Uppercase, OTHER*/
 int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 	int p_case, q_case, p_num, q_num;
 	if(strcmp(p,q) == 0)
@@ -273,6 +273,7 @@ int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 	return 0;
 }
 
+/*Merge line[low] to line[high]*/
 void merging(int low, int mid, int high, keyfield k) {
 	int l1, l2, i, j, flag, flagl1;
 	char a = '\n';
@@ -369,7 +370,7 @@ int main(int argc, char *argv[]) {
 	char c, str[SIZE], *str1 = (char *) malloc(128), *str2 = str1;
 	FILE *f;
 
-	/*Read Keys, Options and Files*/
+	/*Read Keys/Options and File-Names*/
 	void read() {
 		for(i = 1; i < argc; i++) {
 			if(argv[i][0] == '-') {
@@ -505,7 +506,7 @@ int main(int argc, char *argv[]) {
 						k.check = 1;
 						break;
 					default:
-						printf("Invalid Option - '%s'\nTry 'sort --help' for more information\n", argv[i]);
+						printf("Sort: Invalid Option - '%s'\nTry 'sort --help' for more information\n", argv[i]);
 						exit(1);
 				}
 			}
@@ -527,16 +528,16 @@ int main(int argc, char *argv[]) {
 	read();
 	free(str2);
 
-	/*read as filter*/
+	/*Read as Filter*/
 	l = (line *) malloc(sizeof(line) * LINES);
 	if(l == NULL)
 		exit(1);
 
-	/*read from files*/
+	/*Read from Files*/
 	if(k.nfiles > 0)
 		nlines = readfiles(&k);
 	
-	/*read from stdin*/
+	/*Read from STDIN*/
 	else if(k.merge == 0) {
 		int size_text; 
 		nlines = 0;
@@ -546,7 +547,9 @@ int main(int argc, char *argv[]) {
 
 			if(strlen(l[nlines].text) == 127) {
 				size_text = 128;
- 				s = (char *) malloc(size_text);
+ 				s = (char *) malloc(128);
+				if(!s)
+					exit(1);
 				while(fgets(s, size_text, stdin) && s[strlen(s) - 1] != '\n') {
 					size_text += 128;
 	    				l[nlines].text = (char *) realloc(l[nlines].text, size_text);
@@ -584,7 +587,7 @@ int main(int argc, char *argv[]) {
 				}
 			}
 		else
-			for(i = 1; i < nlines; i++){
+			for(i = 1; i < nlines; i++) {
 				if(compare(l[i - 1].text, l[i].text, k.num, k.ignorecase, k.ignoreblanks) == 0) {
 					if(k.nfiles == 1)
 						printf("Sort: %s:%d: Disorder: %s", k.p[0], i + 1, l[i].text);
