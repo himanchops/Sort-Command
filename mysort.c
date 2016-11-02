@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#define LINES 50
 char **b;
 
 /*to read file line by line*/ 
@@ -39,7 +40,7 @@ line *l;
 
 /*Realloc if more lines*/
 void checksize(int count) {
-	static int size_line = 50;
+	static int size_line = LINES;
 	if(count == size_line) {
 		size_line *= 2;
 		l = (line *) realloc(l, sizeof(line) * size_line);
@@ -63,7 +64,7 @@ void get_linedata(int nlines) {
 	int i = 0;
 	while(i < nlines) {
 		l[i].temp = l[i].text;
-		while(ch = *(l[i].temp)){
+		while((ch = *(l[i].temp))){
 			if(ch == 32 || ch == 9)
 				l[i].col++;
 			l[i].temp++;
@@ -176,7 +177,6 @@ void help() {
 
 #define LOW 0	/*lowercase alphabet*/
 #define UPP 1	/*uppercase alphabet*/
-
 /*General Case Precedence : New Line, Space, Digit, Lowercase, Uppercase, OTHER*/
 int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 	int p_case, q_case, p_num, q_num;
@@ -200,21 +200,30 @@ int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 			return 0;
 	}
 
+	if(ignoreblanks) {
+		while(*p == 32 || *p == 9)
+			p++;
+		while(*q == 32 || *q == 9)
+			q++;
+	}
+
 	if(*p == *q)
 		return compare(p + 1, q + 1, num, ignorecase, ignoreblanks);
 
 
-	if(*p == 32)
+	if(*p == 32 || *p == 9)
 		return 1;
-	if(*q == 32)
+	if(*q == 32 || *q == 9)
 		return 0;
 
 
-	if(isdigit(*p) && isdigit(*q))
+	if(isdigit(*p) && isdigit(*q)) {
 		if(*p < *q)
 			return 1;
 		else
 			return 0;
+	}
+
 	if(isdigit(*p))
 		return 1;	
 	if(isdigit(*q))
@@ -231,11 +240,12 @@ int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 		q_case = LOW;
 
 
-	if(p_case == q_case)
+	if(p_case == q_case) {
 		if (*p < *q)
 			return 1;
 		else
 			return 0;
+	}
 
 	if(ignorecase == 1) {
 		if(strcasecmp(p, q) <= 0)
@@ -244,16 +254,19 @@ int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 			return 0;
 	}
 
-	if(p_case == LOW)
+	if(p_case == LOW) {
 		if((*p - 'a') <= (*q - 'A'))
 			return 1;
 		else
  			return 0;
-	if(p_case == UPP)
+	}
+
+	if(p_case == UPP) {
 		if((*p - 'A') < (*q - 'a'))
 			return 1;
 		else
  			return 0;
+	}
 
 	if(*p < *q)
 		return 1;
@@ -261,17 +274,17 @@ int compare(char *p, char *q, int num, int ignorecase, int ignoreblanks) {
 }
 
 void merging(int low, int mid, int high, keyfield k) {
-	int l1, l2, i, j, flag;
+	int l1, l2, i, j, flag, flagl1;
 	char a = '\n';
 	for(l1 = low, l2 = mid + 1, i = low; l1 <= mid && l2 <= high; i++) {
 		l[l1].temp = l[l1].text;
 		l[l2].temp = l[l2].text;
 		/*for -k option*/
 		if(k.keydef == 1) {
-			
-			while(*(l[l1].temp) == 32 || *(l[l1].temp) == 9)	
-				l[l1].temp++;
-			j = 1;
+			if(k.ignoreblanks)	
+				while(*(l[l1].temp) == 32 || *(l[l1].temp) == 9)	
+					l[l1].temp++;
+			j = 1; flagl1 = 1;
 			if(k.key <= l[l1].col)
 				while(j < k.key && *(l[l1].temp)) {
 					flag = 0;
@@ -288,14 +301,16 @@ void merging(int low, int mid, int high, keyfield k) {
 					if(flag == 0)
 						l[l1].temp++;
 				}
-			else if(k.key <= l[l2].col)
+			else if(k.key <= l[l2].col) {
 				l[l2].temp = &a;
+				flagl1 = 0;
+			}
 			
-
-			while(*(l[l2].temp) == 32 || *(l[l2].temp) == 9)	
-				l[l2].temp++;
+			if(flagl1 && k.ignoreblanks)	
+				while(*(l[l2].temp) == 32 || *(l[l2].temp) == 9)	
+					l[l2].temp++;
 			j = 1;
-			if(k.key <= l[l2].col)
+			if(flagl1 && k.key <= l[l2].col)
 				while(j < k.key && *(l[l2].temp)) {
 					flag = 0;
 					if(k.ignoreblanks) {
@@ -311,7 +326,7 @@ void merging(int low, int mid, int high, keyfield k) {
 					if(flag == 0)
 						l[l2].temp++;
 				}
-			else if (k.key <= l[l1].col)
+			else if (flagl1 && k.key <= l[l1].col)
 				l[l1].temp = &a;
 		}
 		if(compare(l[l1].temp, l[l2].temp, k.num, k.ignorecase, k.ignoreblanks))
@@ -350,9 +365,9 @@ int main(int argc, char *argv[]) {
 	keyfield k;
 	init_keys(&k);
 	k.p = (char **) malloc(sizeof(char *) * (argc - 1));
-	int nlines = 0, i, j, sum, m, len;
+	int nlines = 0, i, j, sum, m;
 	char c, str[SIZE], *str1 = (char *) malloc(128), *str2 = str1;
-	FILE *f, *fp;
+	FILE *f;
 
 	/*Read Keys, Options and Files*/
 	void read() {
@@ -365,7 +380,7 @@ int main(int argc, char *argv[]) {
 					case 'k':
 						if(strlen(argv[i]) > 2) {
 							j = 2; sum = 0; 
-							while(c = argv[i][j])
+							while((c = argv[i][j]))
 								if(isdigit(argv[i][j]))
 									sum = sum * 10 + argv[i][j++] - '0';
 								else {
@@ -380,7 +395,7 @@ int main(int argc, char *argv[]) {
 								printf("Sort: Option requires an argument --'k'\nTry 'mysort --help' for more information.\n\n");
 								exit(1);
 							}
-							while(c = argv[i][j])
+							while((c = argv[i][j]))
 								if(isdigit(argv[i][j]))
 									sum = sum * 10 + argv[i][j++] - '0';
 								else {
@@ -513,7 +528,7 @@ int main(int argc, char *argv[]) {
 	free(str2);
 
 	/*read as filter*/
-	l = (line *) malloc(sizeof(line) * 50);
+	l = (line *) malloc(sizeof(line) * LINES);
 	if(l == NULL)
 		exit(1);
 
@@ -598,26 +613,52 @@ int main(int argc, char *argv[]) {
 	}
 	free(b);
 	int tlines = nlines;
-
+	
 	/*Remove Duplicates*/
 	if(k.unique == 1) {
+
+		for(i = 0; i < nlines; i++)
+			l[i].temp = l[i].text;
+
+		/*Ignore Leading Blanks*/		
+		if(k.ignoreblanks) {
+			while(*(l[0].temp) == 32 || *(l[0].temp) == 9)
+				l[0].temp++;
+			while(*(l[1].temp) == 32 || *(l[1].temp) == 9)
+				l[1].temp++;
+		}
 		for(i = 1; i < nlines; i++) {
 			if(k.ignorecase == 0)
-				while(i != nlines && strcmp(l[i].text, l[i - 1].text) == 0) {
-					for(j = i - 1; j < nlines - 1; j++)
+				while(i != nlines && strcmp(l[i].temp, l[i - 1].temp) == 0) {
+					for(j = i - 1; j < nlines - 1; j++) {
 						strcpy(l[j].text, l[j + 1].text);
+						l[j].temp = l[j].text;
+					}
+					if(k.ignoreblanks) {
+						while(*(l[i-1].temp) == 32 || *(l[i-1].temp) == 9)
+							l[i-1].temp++;
+						while(*(l[i].temp) == 32 || *(l[i].temp) == 9)
+							l[i].temp++;
+					}
 					nlines--;
 				}
-			else {
-				while(i != nlines && (strcasecmp(l[i].text, l[i - 1].text) == 0)) {
-					for(j = i - 1; j < nlines - 1; j++)
+			/*Ignore Case*/
+			else
+				while(i != nlines && strcasecmp(l[i].temp, l[i - 1].temp) == 0) {
+					for(j = i - 1; j < nlines - 1; j++) {
 						strcpy(l[j].text, l[j + 1].text);
+						l[j].temp = l[j].text;
+					}
+					if(k.ignoreblanks) {
+						while(*(l[i-1].temp) == 32 || *(l[i-1].temp) == 9)
+							l[i-1].temp++;
+						while(*(l[i].temp) == 32 || *(l[i].temp) == 9)
+							l[i].temp++;
+					}
 					nlines--;
 				}
-			}
 		}
 	}
-
 
 	/*Output on STDOUT or in FILE*/
 	if(k.output == 0) {

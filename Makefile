@@ -1,2 +1,2 @@
 project: mysort.c
-	cc mysort.c -o project
+	cc mysort.c -Wall -o project
